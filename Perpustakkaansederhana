@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Manajemen Perpustakaan</title>
+    <style>
+        /* Styling umum */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+        }
+
+        h1 {
+            color: #4CAF50;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        h2, h3 {
+            color: #333;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px 0;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #addBookForm, #borrowBookForm {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        #addBookForm h3, #borrowBookForm h3 {
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .message {
+            color: green;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f4f4f9;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sistem Manajemen Perpustakaan</h1>
+
+    <?php
+    session_start();
+
+    // Kelas perpustakaan yang berfungsi untuk mengelola buku
+    class Library {
+        private $books = [];
+
+        public function __construct() {
+            if (isset($_SESSION['library_books'])) {
+                $this->books = $_SESSION['library_books'];
+            }
+        }
+
+        public function addBook($title, $author, $year) {
+            $this->books[] = [
+                'title' => $title,
+                'author' => $author,
+                'year' => $year,
+                'borrowed' => false
+            ];
+            $_SESSION['library_books'] = $this->books;
+        }
+
+        public function displayBooks() {
+            if (empty($this->books)) {
+                return "Belum ada buku di perpustakaan.";
+            } else {
+                $output = "<table><tr><th>No</th><th>Judul</th><th>Penulis</th><th>Tahun</th><th>Status</th></tr>";
+                foreach ($this->books as $index => $book) {
+                    $status = $book['borrowed'] ? "Dipinjam" : "Tersedia";
+                    $output .= "<tr><td>" . ($index + 1) . "</td><td>" . $book['title'] . "</td><td>" . $book['author'] . "</td><td>" . $book['year'] . "</td><td>" . $status . "</td></tr>";
+                }
+                $output .= "</table>";
+                return $output;
+            }
+        }
+
+        public function borrowBook($index) {
+            if (isset($this->books[$index - 1]) && !$this->books[$index - 1]['borrowed']) {
+                $this->books[$index - 1]['borrowed'] = true;
+                $_SESSION['library_books'] = $this->books;
+                return true;
+            }
+            return false;
+        }
+
+        public function getBookCount() {
+            return count($this->books);
+        }
+    }
+
+    // Fungsi untuk mengambil input dari form
+    function getUserInput(string $prompt): string {
+        return isset($_POST[$prompt]) ? trim($_POST[$prompt]) : '';
+    }
+
+    function getYearInput(): int {
+        return isset($_POST['year']) ? (int)$_POST['year'] : 0;
+    }
+
+    // Instansiasi objek Library
+    $library = new Library();
+    $message = '';
+    $bookList = '';
+    $borrowMessage = '';
+    $bookCountMessage = '';
+
+    // Handle permintaan POST
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $choice = $_POST['choice'] ?? '';
+
+        switch ($choice) {
+            case '1':
+                $title = getUserInput('title');
+                $author = getUserInput('author');
+                $year = getYearInput();
+                $library->addBook($title, $author, $year);
+                $message = "Buku berhasil ditambahkan!";
+                $bookList = $library->displayBooks();
+                break;
+            case '2':
+                $bookList = $library->displayBooks();
+                break;
+            case '3':
+                $index = (int)getUserInput('book_index');
+                if ($library->borrowBook($index)) {
+                    $borrowMessage = "Buku berhasil dipinjam.";
+                } else {
+                    $borrowMessage = "Gagal meminjam buku. Pastikan nomor buku valid dan buku tersedia.";
+                }
+                $bookList = $library->displayBooks();
+                break;
+            case '4':
+                $bookCount = $library->getBookCount();
+                $bookCountMessage = "Jumlah buku dalam perpustakaan: {$bookCount}";
+                break;
+        }
+    }
+    ?>
+
+    <!-- Form utama -->
+    <form method="post">
+        <h2>Menu:</h2>
+        <button type="button" onclick="toggleForm('addBookForm')">1. Tambah Buku</button>
+        <button type="submit" name="choice" value="2">2. Tampilkan Semua Buku</button>
+        <button type="button" onclick="toggleForm('borrowBookForm')">3. Pinjam Buku</button>
+        <button type="submit" name="choice" value="4">4. Hitung Jumlah Buku</button>
+
+        <div id="addBookForm" style="display:none;">
+            <h3>Tambah Buku:</h3>
+            <input type="text" name="title" placeholder="Judul Buku" required>
+            <input type="text" name="author" placeholder="Nama Penulis" required>
+            <input type="number" name="year" placeholder="Tahun Terbit" required min="1" max="<?php echo date('Y'); ?>">
+            <button type="submit" name="choice" value="1">Simpan Buku</button>
+            <?php if (!empty($message)): ?>
+                <p class="message"><?php echo $message; ?></p>
+            <?php endif; ?>
+        </div>
+
+        <div id="borrowBookForm" style="display:none;">
+            <h3>Pinjam Buku:</h3>
+            <input type="number" name="book_index" placeholder="Nomor Buku" required min="1">
+            <button type="submit" name="choice" value="3">Pinjam Buku</button>
+            <?php if (!empty($borrowMessage)): ?>
+                <p class="message"><?php echo $borrowMessage; ?></p>
+            <?php endif; ?>
+        </div>
+    </form>
+
+    <!-- Menampilkan daftar buku atau jumlah buku -->
+    <?php if (!empty($bookList)): ?>
+        <div>
+            <?php echo $bookList; ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if (!empty($bookCountMessage)): ?>
+        <div>
+            <p><?php echo $bookCountMessage; ?></p>
+        </div>
+    <?php endif; ?>
+
+    <!-- JavaScript untuk mengatur tampilan form -->
+    <script>
+        function toggleForm(formId) {
+            var forms = ['addBookForm', 'borrowBookForm'];
+            forms.forEach(function(id) {
+                document.getElementById(id).style.display = 'none';
+            });
+            document.getElementById(formId).style.display = 'block';
+        }
+    </script>
+</body>
+</html>
